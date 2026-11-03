@@ -32,7 +32,21 @@ textarea:disabled,input:disabled{opacity:.5;cursor:not-allowed}
 .mut{color:var(--mut);font-size:12px}.err{color:var(--no)}.login{max-width:400px;margin:0 auto}.login label{display:block;margin:10px 0 4px;font-weight:600;font-size:13px}
 table{border-collapse:collapse;width:100%;font-size:13px}td,th{padding:6px 8px;border-bottom:1px solid var(--bd);text-align:left}.ov{overflow-x:auto}
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#111827;color:#fff;padding:10px 18px;border-radius:12px;display:none;z-index:9}
-</style></head><body>
+body.lg{background:linear-gradient(135deg,#1e1b4b,#4f46e5,#0891b2,#7c3aed);background-size:300% 300%;animation:bgm 16s ease infinite;min-height:100vh;overflow-x:hidden}
+@keyframes bgm{0%{background-position:0 50%}50%{background-position:100% 50%}100%{background-position:0 50%}}
+body.lg .hero{display:none}body.lg .main{margin-top:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 14px}
+.orb{position:fixed;border-radius:50%;opacity:.35;pointer-events:none;animation:fl 11s ease-in-out infinite}
+.o1{width:260px;height:260px;background:#22d3ee;top:-60px;left:-70px}.o2{width:320px;height:320px;background:#a855f7;bottom:-100px;right:-80px;animation-delay:-4s}.o3{width:160px;height:160px;background:#f472b6;top:55%;left:12%;animation-delay:-7s}
+@keyframes fl{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(40px,-50px) scale(1.15)}}
+.stage{width:100%;max-width:420px;text-align:center;position:relative;z-index:1}
+.tw{color:#fff;font-size:22px;font-weight:700;min-height:34px;margin-bottom:18px;text-shadow:0 2px 14px rgba(0,0,0,.3)}
+.tw::after{content:"";display:inline-block;width:2px;height:1.1em;background:#fff;margin-left:3px;vertical-align:-3px;animation:bl 1s steps(1) infinite}
+@keyframes bl{50%{opacity:0}}@keyframes up{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
+.glass{background:rgba(255,255,255,.14);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.35);border-radius:22px;padding:24px;color:#fff;text-align:left;box-shadow:0 20px 50px rgba(0,0,0,.25);animation:up .9s ease both}
+.glass input{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.35);color:#fff}.glass input::placeholder{color:rgba(255,255,255,.7)}
+.glass .mut{color:rgba(255,255,255,.85)}.glass .err{color:#fecaca}.glass .btn{background:#fff;color:#4338ca}.glass .btn:disabled{opacity:.6}
+@media(prefers-reduced-motion:reduce){body.lg,.orb,.glass,.tw::after{animation:none}}
+</style></head><body class="lg">
 <div class="hero"><div class="wrap"><div><h1>Koreksi Data Keluarga Pegawai</h1><div class="sub">Dashboard &amp; pengecekan kesesuaian data · Oktober 2026</div></div><div id="who"></div></div></div>
 <div class="wrap main" id="app"><div class="card">Memuat…</div></div><div id="toast"></div>
 <script type="module">
@@ -65,12 +79,12 @@ async function logout(msg){S.un.forEach(u=>u());S.un=[];S.u=null;S.cfg=null;S.q=
 let it;const bump=()=>{clearTimeout(it);if(S.u){sessionStorage.setItem('la',Date.now());it=setTimeout(()=>logout('Sesi berakhir karena tidak aktif 15 menit'),15*60000)}};['click','keydown','touchstart'].forEach(e=>addEventListener(e,bump));
 function renderLogin(){$('#who').innerHTML='';
  if(!ok){$('#app').innerHTML='<div class="card"><b>Pengaturan belum diisi.</b><br>Buka file <code>firebase-config.js</code> lalu isi sesuai PANDUAN (Langkah B5).</div>';return}
- $('#app').innerHTML=`<div class="card login"><h2 style="margin-top:0">Masuk</h2>
+ document.body.classList.add('lg');$('#app').innerHTML=`<i class="orb o1"></i><i class="orb o2"></i><i class="orb o3"></i><div class="stage"><div class="tw" id="tw"></div><div class="login glass"><h2 style="margin-top:0">Masuk</h2>
 <div class="mut">Data ini bersifat pribadi. Isi <b>nama asli penginput</b> agar admin dapat melihat siapa yang mengubah data.</div>
 <label>Nama lengkap penginput (nama asli) <span class="err">*</span></label><input type="text" id="ln" autocomplete="name" placeholder="Wajib diisi" required>
 <label>Nama akun</label><input type="text" id="la" autocapitalize="off" autocomplete="username" placeholder="PNS / PPPK / superadmin">
 <label>Kata sandi</label><input type="password" id="lp" autocomplete="current-password"><div class="err" id="le" style="margin:8px 0"></div>
-<button class="btn" id="lb" style="width:100%">Masuk</button></div>`;
+<button class="btn" id="lb" style="width:100%">Masuk</button></div></div>`;typeIt();
  $('#lb').onclick=async()=>{const n=$('#ln').value.trim().replace(/\s+/g,' '),a=$('#la').value.trim().toLowerCase(),p=$('#lp').value,le=$('#le'),b=$('#lb');
   if(Date.now()<S.lock)return le.textContent='Terlalu banyak percobaan. Tunggu 30 detik.';
   if(n.length<3)return le.textContent='Nama lengkap penginput (nama asli) wajib diisi.';
@@ -82,7 +96,9 @@ function renderLogin(){$('#who').innerHTML='';
 function stats(shs){const o={t:0,S:0,T:0,B:0,rows:0},g={};
  shs.forEach(sh=>{const m=S.cfg.map[sh];S.rows[sh].forEach((r,i)=>{if(!r)return;o.rows++;const n=(r[m.nip]||'').trim()||('x'+sh+i),s=eff(sh,i).st,x=g[sh+n]=g[sh+n]||{T:0,S:0,n:0};x.n++;if(s==='Tidak Sesuai')x.T++;else if(s==='Sesuai')x.S++})});
  Object.values(g).forEach(x=>{o.t++;if(x.T)o.T++;else if(x.S===x.n)o.S++;else o.B++});return o}
-function renderApp(){const u=S.u,sup=u.acc==='superadmin';
+function typeIt(){const el=$('#tw'),t='Selamat datang di halaman login kami';if(!el)return;if(matchMedia('(prefers-reduced-motion:reduce)').matches){el.textContent=t;return}
+ let i=0;setTimeout(()=>{const id=setInterval(()=>{if(!document.body.contains(el))return clearInterval(id);el.textContent=t.slice(0,++i);if(i>=t.length)clearInterval(id)},85)},500)}
+function renderApp(){document.body.classList.remove('lg');const u=S.u,sup=u.acc==='superadmin';
  $('#who').innerHTML=`<span class="sub">${esc(u.name)} · ${esc(u.acc)}</span> <button class="btn o" id="lo">Keluar</button>`;$('#lo').onclick=()=>logout();
  const tabs=[['dash','Dashboard'],['cari','Cari & Koreksi']].concat(sup?[['kelola','Kelola Data']]:[]);
  let h='<div class="tabs">'+tabs.map(t=>`<button data-t="${t[0]}" class="${S.tab===t[0]?'on':''}">${t[1]}</button>`).join('')+'</div>';
