@@ -1,0 +1,41 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function em() {
+      return request.auth != null && request.auth.token.email != null ? request.auth.token.email : '';
+    }
+    function isSuper() { return em() == 'superadmin@pegawai.app'; }
+    function grp() {
+      return em() == 'pns@pegawai.app' ? 'PNS' : (em() == 'pppk@pegawai.app' ? 'PPPK' : '');
+    }
+    function canSheet(sh) { return isSuper() || grp() == sh; }
+
+    // Pengaturan data (versi, nama kolom)
+    match /meta/{d} {
+      allow read: if isSuper() || grp() != '';
+      allow write: if isSuper();
+    }
+
+    // Data pegawai (hanya superadmin yang boleh mengisi/mengubah)
+    match /base/{d} {
+      allow read: if canSheet(resource.data.sh);
+      allow write: if isSuper();
+    }
+
+    // Koreksi: hanya 4 isian, hanya pada sheet milik akunnya
+    match /edits/{d} {
+      allow read: if canSheet(resource.data.sh);
+      allow create, update: if canSheet(request.resource.data.sh)
+        && request.resource.data.keys().hasOnly(['sh','s','k','t','by','acc','at'])
+        && request.resource.data.s in ['Sesuai', 'Tidak Sesuai']
+        && request.resource.data.k is string && request.resource.data.k.size() <= 500
+        && request.resource.data.t is string
+        && request.resource.data.t.matches('^[+]?[0-9][0-9 -]{7,14}$')
+        && request.resource.data.by is string
+        && request.resource.data.by.size() >= 3 && request.resource.data.by.size() <= 100
+        && (resource == null || resource.data.sh == request.resource.data.sh);
+      allow delete: if isSuper();
+    }
+  }
+}
