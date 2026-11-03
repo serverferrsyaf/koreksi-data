@@ -116,20 +116,22 @@ function kelola(){let h=`<div class="card"><b>Unggah data Excel</b><div class="m
  if(S.cfg){const l=Object.entries(S.edits).filter(([k])=>k.startsWith(S.cfg.v+'_')).sort((a,b)=>b[1].at-a[1].at).slice(0,20);
   h+=`<div class="card"><b>Unduh data keseluruhan</b><div class="mut" style="margin:4px 0 10px">Berisi koreksi terbaru beserta nama penginput.</div><button class="btn" id="dl">Unduh Excel</button></div><div class="card"><b>Perubahan terakhir</b><div class="ov"><table><tr><th>Waktu</th><th>Penginput</th><th>Akun</th><th>Nama pada data</th><th>Status</th></tr>`+
   l.map(([k,e])=>{const p=k.split('_'),sh=p[1],r=S.rows[sh][+p[2]]||[];return`<tr><td>${new Date(e.at).toLocaleString('id-ID')}</td><td>${esc(e.by)}</td><td>${esc(e.acc)}</td><td>${esc(r[S.cfg.map[sh].nama]||'')}</td><td>${esc(e.s)}</td></tr>`}).join('')+'</table></div></div>'}return h}
+const L=j=>{let t='',n=j+1;while(n){t=String.fromCharCode(65+(n-1)%26)+t;n=Math.floor((n-1)/26)}return t};
 const FLD=[['nip','NIP',/^\s*nip\s*$/i,/nip/i],['nama','Nama',/^\s*(nama|nmkel)/i,/nama|nm/i],['st','Status Sesuai/Tidak Sesuai',/sesuai|status|koreksi/i,/x^/],['ket','Keterangan',/keterangan/i,/ket/i],['tel','Nomor telpon',/telp|telepon|tlp|phone|\bhp\b/i,/hp/i]];
 function bindKelola(){const fx=$('#fx');if(!fx)return;fx.onchange=async()=>{const f=fx.files[0];if(!f)return;$('#imp').textContent='Membaca file…';
   try{const wb=XLSX.read(await f.arrayBuffer(),{type:'array',sheets:['CEKdataPNS','CEKdataPPPK']});S.imp={};
    for(const sh of['PNS','PPPK']){const ws=wb.Sheets[SN[sh]];if(!ws)continue;const a=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:''}),hd=a[0].map(String),w=hd.length;
     const rows=a.slice(1).filter(r=>r.some(x=>String(x).trim()!=='')).map(r=>{r=r.slice(0,w).map(String);while(r.length<w)r.push('');return r});
-    const mp={};FLD.forEach(([k,,a1,a2])=>{let j=hd.findIndex(x=>a1.test(x));if(j<0)j=hd.findIndex(x=>a2.test(x));mp[k]=j});S.imp[sh]={hd,rows,mp}}
+    const mp={};FLD.forEach(([k,,a1,a2])=>{let j=hd.findIndex(x=>a1.test(x));if(j<0)j=hd.findIndex(x=>a2.test(x));mp[k]=j});if(mp.nip<0){const sm=rows.slice(0,80);let best=-1,bs=0;hd.forEach((_,j)=>{const c=sm.filter(r=>/^\d{18}$/.test(String(r[j]).replace(/\s/g,''))).length;if(c>bs){bs=c;best=j}});if(bs>=sm.length*.5)mp.nip=best}
+    S.imp[sh]={hd,rows,mp}}
    if(!Object.keys(S.imp).length){$('#imp').innerHTML='<span class="err">Sheet CEKdataPNS / CEKdataPPPK tidak ditemukan.</span>';return}
    let h='<div class="mut">Periksa pemetaan kolom (kolom baru akan ditambahkan bila belum ada):</div>';
-   for(const sh in S.imp){const o=S.imp[sh];h+=`<p><b>${SN[sh]}</b> — ${o.rows.length} baris</p><div class="grid">`+FLD.map(([k,l])=>`<div><span class="mut">${l}</span><select data-sh="${sh}" data-k="${k}">${k==='nip'||k==='nama'?'':'<option value="-1">(buat kolom baru)</option>'}${o.hd.map((x,j)=>`<option value="${j}" ${o.mp[k]===j?'selected':''}>${esc(x)}</option>`).join('')}</select></div>`).join('')+'</div>'}
+   for(const sh in S.imp){const o=S.imp[sh];h+=`<p><b>${SN[sh]}</b> — ${o.rows.length} baris</p><div class="grid">`+FLD.map(([k,l])=>`<div><span class="mut">${l}</span><select data-sh="${sh}" data-k="${k}"><option value="-1" ${o.mp[k]<0?'selected':''}>${k==='nip'||k==='nama'?'— pilih kolom —':'(buat kolom baru)'}</option>${o.hd.map((x,j)=>`<option value="${j}" ${o.mp[k]===j?'selected':''}>${L(j)} · ${esc(x||'(tanpa judul)')} · ${esc(String(o.rows[0]?.[j]??'').slice(0,18))}</option>`).join('')}</select></div>`).join('')+'</div>'}
    $('#imp').innerHTML=h+'<p><button class="btn g" id="go">Simpan ke Database</button> <span id="pg" class="mut"></span></p>';
    document.querySelectorAll('#imp select').forEach(s=>s.onchange=()=>S.imp[s.dataset.sh].mp[s.dataset.k]=+s.value);$('#go').onclick=doImport}catch(x){$('#imp').innerHTML='<span class="err">Gagal membaca file: '+esc(x.message)+'</span>'}};
  const d=$('#dl');if(d)d.onclick=exportAll}
 async function doImport(){$('#go').disabled=true;const v=Date.now().toString(36),cfg={v,headers:{},map:{},at:Date.now(),by:S.u.name},pg=$('#pg'),oldC=Object.values(S.cb).flat().map(c=>c.id),oldE=Object.keys(S.edits);
- try{for(const sh in S.imp){const o=S.imp[sh],mp=o.mp;if(mp.nip<0||mp.nama<0)throw new Error('Kolom NIP dan Nama wajib dipilih ('+sh+')');
+ try{for(const sh in S.imp){const o=S.imp[sh],mp=o.mp;if(mp.nip<0||mp.nama<0)throw new Error('Pilih dulu kolom NIP dan Nama untuk '+SN[sh]);
    [['st','Status Kesesuaian'],['ket','Keterangan'],['tel','Nomor Telpon']].forEach(([k,n])=>{if(mp[k]<0){mp[k]=o.hd.length;o.hd.push(n);o.rows.forEach(r=>r.push(''))}});
    cfg.headers[sh]=o.hd;cfg.map[sh]=mp;let buf=[],sz=0,o0=0,n=0;
    const flush=async()=>{if(!buf.length)return;await setDoc(doc(db,'base',v+'_'+sh+'_'+n++),{v,sh,o:o0,rows:buf});o0+=buf.length;buf=[];sz=0;pg.textContent='Menyimpan '+sh+': '+o0+'/'+o.rows.length};
