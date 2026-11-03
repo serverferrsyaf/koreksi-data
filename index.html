@@ -37,7 +37,7 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{padding:6px 8px;b
 <div class="wrap main" id="app"><div class="card">Memuat…</div></div><div id="toast"></div>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getAuth,setPersistence,inMemoryPersistence,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getAuth,setPersistence,browserSessionPersistence,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {getFirestore,doc,setDoc,deleteDoc,onSnapshot,collection,query,where} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {FIREBASE_CONFIG,EMAIL_DOMAIN} from "./firebase-config.js";
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -48,9 +48,12 @@ const norm=v=>/tidak/i.test(v||'')?'Tidak Sesuai':/^\s*sesuai/i.test(v||'')?'Ses
 const eid=(sh,i)=>S.cfg.v+'_'+sh+'_'+i;
 const ok=!String(FIREBASE_CONFIG.apiKey).startsWith('ISI');
 let auth,db;
-if(ok){const app=initializeApp(FIREBASE_CONFIG);auth=getAuth(app);db=getFirestore(app);setPersistence(auth,inMemoryPersistence)}
+if(ok){const app=initializeApp(FIREBASE_CONFIG);auth=getAuth(app);db=getFirestore(app);setPersistence(auth,browserSessionPersistence)}
+const KN=['NIP','Kode Hubungan Keluarga','Nama','Status Kepegawaian','Gelar Depan','Gelar Belakang','Kode Jenis Kelamin','Tanggal Lahir','Kode Status Kawin','Tanggal Nikah','Tanggal Cerai','Tanggal Wafat','Tanggal SKS','Kolom Tambahan','TAT SKS','No SKS','Kode Tunjangan','NIP Suami/Istri','Waktu Update','Penginput Data','Pekerjaan','Kode Dati 1','Kode Dati 2','Kode SKPD','Nama SKPD'];
+const lay=sh=>{const m=S.cfg.map[sh],rs=S.rows[sh].filter(Boolean).slice(0,60);return rs.length>0&&rs.filter(r=>/^\d{2}$/.test((r[m.nip+1]||'').trim())).length>=rs.length*.7};
+const lab=(sh,j,ly)=>{const off=j-S.cfg.map[sh].nip;return ly&&off>=0&&off<KN.length?KN[off]:(S.cfg.headers[sh][j]||'').trim()||'Kolom '+L(j)};
 function eff(sh,i){const m=S.cfg.map[sh],r=S.rows[sh][i]||[],e=S.edits[eid(sh,i)];return{st:norm(e?e.s:r[m.st]),ket:e?e.k:r[m.ket]||'',tel:e?e.t:r[m.tel]||'',e}}
-function rebuild(){S.rows={PNS:[],PPPK:[]};if(S.cfg)Object.values(S.cb).flat().filter(c=>c.v===S.cfg.v).forEach(c=>c.rows.forEach((r,k)=>S.rows[c.sh][c.o+k]=JSON.parse(r)));refresh()}
+function rebuild(){S.rows={PNS:[],PPPK:[]};if(S.cfg)Object.values(S.cb).flat().filter(c=>c.v===S.cfg.v).forEach(c=>c.rows.forEach((r,k)=>S.rows[c.sh][c.o+k]=JSON.parse(r)));if(S.cfg)['PNS','PPPK'].forEach(sh=>{if(S.cfg.map[sh]&&lay(sh))S.cfg.map[sh].nama=S.cfg.map[sh].nip+2});refresh()}
 function refresh(){if(!S.u)return renderLogin();renderApp()}
 const bad=e=>toast('Akses ditolak atau koneksi bermasalah: '+(e.code||e.message));
 function subscribe(){S.un=[];S.cb={};S.eb={};S.edits={};
@@ -58,8 +61,8 @@ function subscribe(){S.un=[];S.cb={};S.eb={};S.edits={};
  AK[S.u.acc].forEach(sh=>{
   S.un.push(onSnapshot(query(collection(db,'base'),where('sh','==',sh)),q=>{S.cb[sh]=q.docs.map(d=>({id:d.id,...d.data()}));rebuild()},bad));
   S.un.push(onSnapshot(query(collection(db,'edits'),where('sh','==',sh)),q=>{S.eb[sh]=q.docs.map(d=>[d.id,d.data()]);S.edits={};Object.values(S.eb).forEach(a=>a.forEach(([k,v])=>S.edits[k]=v));if(!$('#res')?.contains(document.activeElement))refresh()},bad))})}
-async function logout(msg){S.un.forEach(u=>u());S.un=[];S.u=null;S.cfg=null;S.q='';S.imp=null;S.rows={PNS:[],PPPK:[]};S.edits={};try{await signOut(auth)}catch(e){}refresh();if(msg)toast(msg)}
-let it;const bump=()=>{clearTimeout(it);if(S.u)it=setTimeout(()=>logout('Sesi berakhir karena tidak aktif 15 menit'),15*60000)};['click','keydown','touchstart'].forEach(e=>addEventListener(e,bump));
+async function logout(msg){S.un.forEach(u=>u());S.un=[];S.u=null;S.cfg=null;S.q='';S.imp=null;sessionStorage.clear();clearTimeout(it);S.rows={PNS:[],PPPK:[]};S.edits={};try{await signOut(auth)}catch(e){}refresh();if(msg)toast(msg)}
+let it;const bump=()=>{clearTimeout(it);if(S.u){sessionStorage.setItem('la',Date.now());it=setTimeout(()=>logout('Sesi berakhir karena tidak aktif 15 menit'),15*60000)}};['click','keydown','touchstart'].forEach(e=>addEventListener(e,bump));
 function renderLogin(){$('#who').innerHTML='';
  if(!ok){$('#app').innerHTML='<div class="card"><b>Pengaturan belum diisi.</b><br>Buka file <code>firebase-config.js</code> lalu isi sesuai PANDUAN (Langkah B5).</div>';return}
  $('#app').innerHTML=`<div class="card login"><h2 style="margin-top:0">Masuk</h2>
@@ -73,8 +76,8 @@ function renderLogin(){$('#who').innerHTML='';
   if(n.length<3)return le.textContent='Nama lengkap penginput (nama asli) wajib diisi.';
   if(!a||!p)return le.textContent='Isi nama akun dan kata sandi.';
   b.disabled=true;le.textContent='';
-  try{if(!ACC[a])throw{code:'auth/invalid-credential'};await signInWithEmailAndPassword(auth,a+'@'+EMAIL_DOMAIN,p);S.u={name:n,acc:ACC[a]};S.fail=0;S.tab='dash';subscribe();bump();refresh()}
-  catch(x){if(++S.fail>=5){S.lock=Date.now()+30000;S.fail=0}b.disabled=false;le.textContent=x.code==='auth/too-many-requests'?'Terlalu banyak percobaan. Coba lagi nanti.':x.code==='auth/network-request-failed'?'Tidak ada koneksi internet.':'Nama akun atau kata sandi salah.'}};
+  try{if(!ACC[a])throw{code:'auth/invalid-credential'};sessionStorage.setItem('nm',n);sessionStorage.setItem('la',Date.now());await signInWithEmailAndPassword(auth,a+'@'+EMAIL_DOMAIN,p);S.fail=0;if(!S.u){S.u={name:n,acc:ACC[a]};S.tab='dash';subscribe();bump()}refresh()}
+  catch(x){sessionStorage.clear();if(++S.fail>=5){S.lock=Date.now()+30000;S.fail=0}b.disabled=false;le.textContent=x.code==='auth/too-many-requests'?'Terlalu banyak percobaan. Coba lagi nanti.':x.code==='auth/network-request-failed'?'Tidak ada koneksi internet.':'Nama akun atau kata sandi salah.'}};
  $('#lp').onkeydown=e=>{if(e.key==='Enter')$('#lb').click()}}
 function stats(shs){const o={t:0,S:0,T:0,B:0,rows:0},g={};
  shs.forEach(sh=>{const m=S.cfg.map[sh];S.rows[sh].forEach((r,i)=>{if(!r)return;o.rows++;const n=(r[m.nip]||'').trim()||('x'+sh+i),s=eff(sh,i).st,x=g[sh+n]=g[sh+n]||{T:0,S:0,n:0};x.n++;if(s==='Tidak Sesuai')x.T++;else if(s==='Sesuai')x.S++})});
@@ -86,7 +89,7 @@ function renderApp(){const u=S.u,sup=u.acc==='superadmin';
  if(!S.cfg&&S.tab!=='kelola')h+=`<div class="card">Data belum tersedia.${sup?' Buka tab <b>Kelola Data</b> untuk mengunggah file Excel.':' Hubungi superadmin.'}</div>`;
  else if(S.tab==='dash')h+=dash(AK[u.acc]);else if(S.tab==='cari')h+=`<div class="card"><div style="display:flex;gap:8px"><input type="text" id="q" placeholder="Ketik NIP atau nama pegawai…" value="${esc(S.q)}"><button class="btn" id="qb">Cari</button></div></div><div id="res">${search()}</div>`;
  else h+=kelola();
- $('#app').innerHTML=h;document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{S.tab=b.dataset.t;refresh()});
+ $('#app').innerHTML=h;document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{S.tab=b.dataset.t;sessionStorage.setItem('tb',S.tab);refresh()});
  if(S.tab==='cari'&&S.cfg){$('#qb').onclick=()=>{S.q=$('#q').value.trim();$('#res').innerHTML=search()};$('#q').onkeydown=e=>{if(e.key==='Enter')$('#qb').click()};bindRes()}
  if(S.tab==='kelola')bindKelola()}
 function dash(shs){const a=stats(shs),pc=n=>a.t?Math.round(n*100/a.t):0,d=`conic-gradient(var(--no) 0 ${pc(a.T)}%,var(--ok) ${pc(a.T)}% ${pc(a.T)+pc(a.S)}%,var(--wa) ${pc(a.T)+pc(a.S)}% 100%)`;
@@ -100,7 +103,7 @@ function search(){if(!S.q)return'<div class="card mut">Masukkan NIP atau nama un
  keys.forEach(k=>{const[sh,nip]=k.split('|'),m=S.cfg.map[sh];h+=`<div class="card"><b>NIP ${esc(nip)}</b> <span class="mut">· ${sh}</span></div>`;
   S.rows[sh].forEach((r,i)=>{if(r&&(r[m.nip]||'').trim()===nip)h+=card(sh,i)})});return h}
 function card(sh,i){const r=S.rows[sh][i],hd=S.cfg.headers[sh],f=eff(sh,i),m=S.cfg.map[sh],skip=[m.st,m.ket,m.tel],pc=f.st==='Sesuai'?'S':f.st?'T':'B';
- let kv=hd.map((x,j)=>skip.includes(j)||!String(r[j]??'').trim()?'':`<div><span>${esc(x)}</span>${esc(r[j])}</div>`).join('');
+ const ly=lay(sh);let kv=hd.map((x,j)=>{if(skip.includes(j))return'';const v=String(r[j]??'').trim();return`<div><span>${esc(lab(sh,j,ly))}</span>${v?esc(v):'<i class="mut">–</i>'}</div>`}).join('');
  return`<div class="card" data-sh="${sh}" data-i="${i}"><div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:8px"><b>${esc(r[m.nama]||'(tanpa nama)')}</b><span class="pill p-${pc}">${f.st||'Belum dicek'}</span></div><div class="kv">${kv}</div>
 <div class="edit"><div class="rad"><label><input type="radio" name="s${sh}${i}" value="Sesuai" ${f.st==='Sesuai'?'checked':''}> ✓ Sesuai</label><label><input type="radio" name="s${sh}${i}" value="Tidak Sesuai" ${f.st==='Tidak Sesuai'?'checked':''}> ✗ Tidak Sesuai</label></div>
 <textarea rows="2" maxlength="500" class="k" placeholder="Keterangan (khusus jika Tidak Sesuai)" ${f.st==='Tidak Sesuai'?'':'disabled'}>${esc(f.st==='Tidak Sesuai'?f.ket:'')}</textarea>
@@ -123,6 +126,7 @@ function bindKelola(){const fx=$('#fx');if(!fx)return;fx.onchange=async()=>{cons
    for(const sh of['PNS','PPPK']){const ws=wb.Sheets[SN[sh]];if(!ws)continue;const a=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:''}),hd=a[0].map(String),w=hd.length;
     const rows=a.slice(1).filter(r=>r.some(x=>String(x).trim()!=='')).map(r=>{r=r.slice(0,w).map(String);while(r.length<w)r.push('');return r});
     const mp={};FLD.forEach(([k,,a1,a2])=>{let j=hd.findIndex(x=>a1.test(x));if(j<0)j=hd.findIndex(x=>a2.test(x));mp[k]=j});if(mp.nip<0){const sm=rows.slice(0,80);let best=-1,bs=0;hd.forEach((_,j)=>{const c=sm.filter(r=>/^\d{18}$/.test(String(r[j]).replace(/\s/g,''))).length;if(c>bs){bs=c;best=j}});if(bs>=sm.length*.5)mp.nip=best}
+    if(mp.nip>=0&&rows.slice(0,60).filter(r=>/^\d{2}$/.test((r[mp.nip+1]||'').trim())).length>=Math.min(60,rows.length)*.7)mp.nama=mp.nip+2;
     S.imp[sh]={hd,rows,mp}}
    if(!Object.keys(S.imp).length){$('#imp').innerHTML='<span class="err">Sheet CEKdataPNS / CEKdataPPPK tidak ditemukan.</span>';return}
    let h='<div class="mut">Periksa pemetaan kolom (kolom baru akan ditambahkan bila belum ada):</div>';
@@ -145,5 +149,8 @@ function exportAll(){const wb=XLSX.utils.book_new();
   S.rows[sh].forEach((r,i)=>{if(!r)return;const f=eff(sh,i),x=r.slice();x[m.st]=f.st;x[m.ket]=f.ket;x[m.tel]=f.tel;a.push(x.concat(f.e?[f.e.by,f.e.acc,new Date(f.e.at).toLocaleString('id-ID')]:['','','']))});
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(a),SN[sh])});
  XLSX.writeFile(wb,'DATA_KELUARGA_terkoreksi.xlsx')}
-refresh();
+if(!ok)refresh();else{$('#app').innerHTML='<div class="card">Memuat…</div>';
+ onAuthStateChanged(auth,u=>{if(u&&!S.u){const a=(u.email||'').split('@')[0],nm=sessionStorage.getItem('nm'),la=+sessionStorage.getItem('la')||0;
+  if(ACC[a]&&nm&&Date.now()-la<15*60000){S.u={name:nm,acc:ACC[a]};S.tab=sessionStorage.getItem('tb')||'dash';subscribe();bump()}else signOut(auth)}
+  if(!u&&S.u)S.u=null;refresh()})}
 </script></body></html>
