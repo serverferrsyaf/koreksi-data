@@ -114,7 +114,9 @@ Aturan ini memastikan: hanya 3 akun tadi yang bisa membaca data; akun PNS hanya 
 5. Cek tab **Dashboard** dan **Cari & Koreksi**.
 6. Bagikan alamat web beserta nama akun dan sandi: akun **PNS** untuk pegawai PNS, akun **PPPK** untuk pegawai PPPK. Kirim sandi lewat jalur internal (jangan ditempel di grup terbuka).
 
-Mengunduh hasil: tab **Kelola Data → Unduh Excel**. Hasilnya memuat koreksi terbaru, plus kolom *Diubah Oleh*, *Akun*, dan *Waktu Ubah*.
+Aplikasi otomatis mengenali baris judul (baris yang berisi `nip`) dan menghapus kolom yang seluruhnya kosong saat unggah, sehingga file Excel hasil unduhan rapi. Jika Anda mengubah cara membaca data, unggah ulang file Excel (ini mengganti data dan koreksi yang lama).
+
+Mengunduh hasil: tab **Kelola Data → Unduh Excel (berwarna)**. Judul kolom berwarna: **indigo** = data asli, **hijau** = isian koreksi (Status, Keterangan, Nomor Telpon), **oranye** = jejak perubahan (Diubah Oleh, Akun, Waktu Ubah). Status Sesuai/Tidak Sesuai diberi warna hijau/merah. Jika komputer terasa berat saat menyiapkan file, pakai **Unduh versi ringan** (tanpa warna). Hasilnya memuat koreksi terbaru, plus kolom *Diubah Oleh*, *Akun*, dan *Waktu Ubah*.
 
 Mengubah isi `firebase-config.js` atau `index.html` kemudian: buka file di GitHub → ikon pensil → ubah → **Commit changes**.
 
