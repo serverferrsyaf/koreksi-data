@@ -3,12 +3,13 @@
 // Salin nilai dari Firebase Console > Project settings > Your apps
 // ============================================================
 export const FIREBASE_CONFIG = {
-  apiKey: "ISI_API_KEY",
-  authDomain: "ISI_PROJECT_ID.firebaseapp.com",
-  projectId: "ISI_PROJECT_ID",
-  storageBucket: "ISI_PROJECT_ID.appspot.com",
-  messagingSenderId: "ISI_SENDER_ID",
-  appId: "ISI_APP_ID"
+  apiKey: "AIzaSyAWSACziYWmSJxtAV-WSk3SwDzeODvaYZY",
+  authDomain: "validasi-data-pegawai.firebaseapp.com",
+  projectId: "validasi-data-pegawai",
+  storageBucket: "validasi-data-pegawai.firebasestorage.app",
+  messagingSenderId: "768633837900",
+  appId: "1:768633837900:web:d58ae192c1f5948aeb17e9",
+  measurementId: "G-R1SN17DNTH"
 };
 
 // Jangan diubah kecuali Anda juga mengubah firestore.rules dan email akun di Firebase
