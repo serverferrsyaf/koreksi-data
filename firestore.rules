@@ -11,31 +11,42 @@ service cloud.firestore {
     }
     function canSheet(sh) { return isSuper() || grp() == sh; }
 
-    // Pengaturan data (versi, nama kolom)
+    // Aturan satu catatan koreksi: hanya 7 isian, hanya pada sheet milik akunnya
+    function validEdit(id) {
+      let x = request.resource.data;
+      return canSheet(x.sh)
+        && id.matches('^[a-z0-9]+_' + x.sh + '_[0-9]+$')
+        && x.keys().hasOnly(['sh','s','k','t','by','acc','at'])
+        && x.keys().hasAll(['sh','s','k','t','by','acc','at'])
+        && x.s in ['Sesuai', 'Tidak Sesuai']
+        && x.k is string && x.k.size() <= 500
+        && x.t is string && x.t.matches('^[+]?[0-9][0-9 -]{7,14}$')
+        && x.by is string && x.by.size() >= 3 && x.by.size() <= 100
+        && (grp() == '' || x.by.matches('^[0-9]{18} .+$'))
+        && x.acc == (isSuper() ? 'superadmin' : grp())
+        && x.at is number
+        && (resource == null || resource.data.sh == x.sh);
+    }
+
+    // Pengaturan data (versi, nama kolom, kamus kode)
     match /meta/{d} {
       allow read: if isSuper() || grp() != '';
       allow write: if isSuper();
     }
 
-    // Data pegawai (hanya superadmin yang boleh mengisi/mengubah)
+    // Data pegawai dan keluarga (hanya superadmin yang boleh mengisi/mengubah)
     match /base/{d} {
       allow read: if canSheet(resource.data.sh);
       allow write: if isSuper();
     }
 
-    // Koreksi: hanya 4 isian, hanya pada sheet milik akunnya
+    // Koreksi dari pegawai
     match /edits/{d} {
       allow read: if canSheet(resource.data.sh);
-      allow create, update: if canSheet(request.resource.data.sh)
-        && request.resource.data.keys().hasOnly(['sh','s','k','t','by','acc','at'])
-        && request.resource.data.s in ['Sesuai', 'Tidak Sesuai']
-        && request.resource.data.k is string && request.resource.data.k.size() <= 500
-        && request.resource.data.t is string
-        && request.resource.data.t.matches('^[+]?[0-9][0-9 -]{7,14}$')
-        && request.resource.data.by is string
-        && request.resource.data.by.size() >= 3 && request.resource.data.by.size() <= 100
-        && (resource == null || resource.data.sh == request.resource.data.sh);
+      allow create, update: if validEdit(d);
       allow delete: if isSuper();
     }
+
+    // Semua yang lain ditolak secara bawaan
   }
 }
