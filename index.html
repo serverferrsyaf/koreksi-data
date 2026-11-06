@@ -1,7 +1,8 @@
 <!doctype html>
 <html lang="id"><head><meta charset="utf-8"><title>Koreksi Data Keluarga Pegawai</title>
 <meta name="robots" content="noindex,nofollow">
-<meta name="referrer" content="no-referrer">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://cdnjs.cloudflare.com https://www.google.com https://www.recaptcha.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://www.gstatic.com; font-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://www.google.com https://www.recaptcha.net; frame-src https://www.google.com https://www.recaptcha.net https://*.firebaseapp.com; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
@@ -120,7 +121,8 @@ html.tt *{transition:background-color .4s,color .4s,border-color .4s,box-shadow 
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,setPersistence,browserSessionPersistence,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {getFirestore,doc,setDoc,deleteDoc,onSnapshot,collection,query,where} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import {FIREBASE_CONFIG,EMAIL_DOMAIN} from "./firebase-config.js";
+import * as CFG from "./firebase-config.js";
+const {FIREBASE_CONFIG,EMAIL_DOMAIN}=CFG,RC_KEY=String(CFG.RECAPTCHA_SITE_KEY||"").trim();
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ACC={pns:'PNS',pppk:'PPPK',superadmin:'superadmin'},AK={PNS:['PNS'],PPPK:['PPPK'],superadmin:['PNS','PPPK']},SN={PNS:'CEKdataPNS',PPPK:'CEKdataPPPK'};
 const S={cat:'ALL',nips:{PNS:new Map(),PPPK:new Map()},gk:{PNS:[],PPPK:[]},emp:{PNS:new Map(),PPPK:new Map()},cfgReady:false,loginMsg:'',u:null,cfg:null,cb:{},eb:{},rows:{PNS:[],PPPK:[]},edits:{},tab:'dash',fail:0,lock:0,imp:null,q:'',un:[]};
@@ -130,7 +132,9 @@ const eid=(sh,i)=>S.cfg.v+'_'+sh+'_'+i;
 const ok=!String(FIREBASE_CONFIG.apiKey).startsWith('ISI');
 const TH=()=>{try{return localStorage.getItem('tema')}catch(e){return null}};document.documentElement.dataset.theme=TH()||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');
 let auth,db;
-if(ok){const app=initializeApp(FIREBASE_CONFIG);auth=getAuth(app);db=getFirestore(app);setPersistence(auth,browserSessionPersistence)}
+if(ok){const app=initializeApp(FIREBASE_CONFIG);
+ if(RC_KEY&&!RC_KEY.startsWith('ISI')){try{const m=await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check.js');m.initializeAppCheck(app,{provider:new m.ReCaptchaV3Provider(RC_KEY),isTokenAutoRefreshEnabled:true})}catch(e){console.warn('App Check tidak aktif',e)}}
+ auth=getAuth(app);db=getFirestore(app);setPersistence(auth,browserSessionPersistence)}
 const COLS={gd:/^glrdepan$/i,gb:/^glrbelakang$/i,jk:/^kdjenkel$/i,tl:/^tgllhr$/i,kw:/^kdstawin$/i,nk:/^tglnikah$/i,cr:/^tglcerai$/i,wf:/^tglwafat$/i,sk:/^tglsks$/i,tt:/^tatsks$/i,ns:/^nosks$/i,tj:/^kdtunjang$/i,sn:/^nipsuamiistri$/i,pk:/^pekerjaan$/i};
 const ix=(sh,k)=>{const c=S.ixc=S.ixc||{},id=(S.cfg&&S.cfg.v||'')+sh;c[id]=c[id]||{};if(c[id][k]===undefined)c[id][k]=S.cfg.headers[sh].findIndex(h=>COLS[k].test(String(h).trim()));return c[id][k]};
 const DEFK={KDJENKEL:{'1':'LAKI-LAKI','2':'PEREMPUAN'},KDSTAWIN:{'1':'TIDAK KAWIN','2':'KAWIN','3':'JANDA/DUDA'},KDTUNJANG:{'1':'TIDAK TERTUNJANG','2':'TERTUNJANG','3':'TERCATAT'}};
@@ -155,7 +159,20 @@ function verify(){const u=S.u,sh=u.acc;if(!S.cfgReady||S.cb[sh]===undefined)retu
  u.name=String(en||(i!==undefined?S.rows[sh][i][S.cfg.map[sh].nama]:'')||'').trim()||'Pegawai';u.pend=false;if(!S.q)S.q=u.nip;refresh()}
 async function denyLogin(m){S.loginMsg=m;await logout()}
 const startVT=()=>{clearTimeout(S.vt);if(S.u&&S.u.pend)S.vt=setTimeout(()=>{if(S.u&&S.u.pend)denyLogin('Gagal memuat data. Periksa koneksi lalu coba lagi.')},45000)};
-const bad=e=>toast('Akses ditolak atau koneksi bermasalah: '+(e.code||e.message));
+const loginErr=c=>{c=String(c||'');
+ if(/too-many-requests/.test(c))return'Terlalu banyak percobaan. Coba lagi nanti.';
+ if(/network-request-failed/.test(c))return'Tidak ada koneksi internet.';
+ if(/referer|referrer/.test(c))return'Kunci API menolak alamat situs ini. Tambahkan '+location.origin+'/* pada pembatasan situs kunci API (PANDUAN bagian H2). ('+c+')';
+ if(/api-key-not-valid|invalid-api-key|api-key-expired/.test(c))return'Kunci API tidak valid. Periksa apiKey di firebase-config.js. ('+c+')';
+ if(/requests-to-this-api|api-key-service-blocked|are-blocked/.test(c))return'Kunci API belum mengizinkan layanan login. Pada pembatasan API centang Identity Toolkit API dan Token Service API. ('+c+')';
+ if(/operation-not-allowed/.test(c))return'Login Email/Password belum diaktifkan di Firebase Authentication. ('+c+')';
+ if(/user-disabled/.test(c))return'Akun dinonaktifkan di Firebase. ('+c+')';
+ if(/app-check|appcheck/.test(c))return'App Check menolak permintaan. Periksa pengaturan App Check. ('+c+')';
+ if(!c||/invalid-credential|wrong-password|user-not-found|invalid-email|invalid-login/.test(c))return'Nama akun atau kata sandi salah.';
+ return'Login gagal. Kode: '+c};
+const credErr=c=>!c||/invalid-credential|wrong-password|user-not-found|invalid-email|invalid-login/.test(String(c));
+const dataErr=e=>{const c=e&&e.code||'';return c==='permission-denied'?'Akses data ditolak oleh aturan Firestore. Pastikan firestore.rules terbaru sudah dipublikasikan.':c==='unavailable'?'Server data tidak terjangkau. Periksa koneksi internet.':'Gagal memuat data ('+(c||'tidak diketahui')+').'};
+const bad=e=>{if(S.u&&S.u.pend)return denyLogin(dataErr(e));toast('Akses ditolak atau koneksi bermasalah: '+(e.code||e.message))};
 function subscribe(){S.un=[];S.cb={};S.eb={};S.edits={};S.cfgReady=false;
  S.un.push(onSnapshot(doc(db,'meta','cfg'),s=>{S.cfg=s.exists()?s.data():null;S.cfgReady=true;rebuild()},bad));
  AK[S.u.acc].forEach(sh=>{
@@ -168,7 +185,7 @@ function renderLogin(){ if(!ok){$('#app').innerHTML='<div class="card"><b>Pengat
 <div class="fld"><label>NIP <span class="err">*</span></label><input type="text" id="ln" inputmode="numeric" maxlength="22" autocomplete="off" placeholder="18 digit NIP"></div>
 <div class="fld"><label>Nama akun (PNS / PPPK)</label><input type="text" id="la" autocapitalize="off" autocomplete="username" placeholder="PNS atau PPPK"></div>
 <div class="fld"><label>Kata sandi</label><input type="password" id="lp" autocomplete="current-password" placeholder="Masukkan kata sandi"></div>
-<div class="err" id="le"></div><button class="btn" id="lb" style="width:100%">Masuk</button></div><div class="mut" style="color:#ffffffaa;margin-top:12px;font-size:11px">Versi 3.9</div></div>`;typeIt();
+<div class="err" id="le"></div><button class="btn" id="lb" style="width:100%">Masuk</button></div><div class="mut" style="color:#ffffffaa;margin-top:12px;font-size:11px">Versi 4.1</div></div>`;typeIt();
  if(S.loginMsg)$('#le').textContent=S.loginMsg
  $('#lb').onclick=async()=>{const nip=$('#ln').value.replace(/\s/g,''),a=$('#la').value.trim().toLowerCase(),p=$('#lp').value,le=$('#le'),b=$('#lb'),acc=ACC[a];
   if(Date.now()<S.lock)return le.textContent='Terlalu banyak percobaan. Tunggu 30 detik.';
@@ -178,7 +195,7 @@ function renderLogin(){ if(!ok){$('#app').innerHTML='<div class="card"><b>Pengat
   b.disabled=true;le.textContent='';S.loginMsg='';
   try{if(!acc)throw{code:'auth/invalid-credential'};sessionStorage.setItem('nip',nip);sessionStorage.setItem('la',Date.now());await signInWithEmailAndPassword(auth,a+'@'+EMAIL_DOMAIN,p);S.fail=0;
    if(!S.u){S.u={nip,acc,name:acc==='superadmin'?'Superadmin':'',pend:acc!=='superadmin'};S.tab=acc==='superadmin'?'dash':'cari';sessionStorage.setItem('tb',S.tab);if(S.u.pend)S.q=nip;subscribe();bump();startVT()}refresh()}
-  catch(x){sessionStorage.clear();if(++S.fail>=5){S.lock=Date.now()+30000;S.fail=0}b.disabled=false;le.textContent=x.code==='auth/too-many-requests'?'Terlalu banyak percobaan. Coba lagi nanti.':x.code==='auth/network-request-failed'?'Tidak ada koneksi internet.':'Nama akun atau kata sandi salah.'}};
+  catch(x){sessionStorage.clear();if(credErr(x.code)&&++S.fail>=5){S.lock=Date.now()+30000;S.fail=0}b.disabled=false;le.textContent=loginErr(x.code)}};
  $('#lp').onkeydown=e=>{if(e.key==='Enter')$('#lb').click()}}
 function renderChecking(){document.body.classList.remove('on');document.body.classList.add('lg');if($('#chk'))return;$('#app').innerHTML='<i class="orb o1"></i><i class="orb o2"></i><i class="orb o3"></i><div class="stage" id="chk"><div class="login glass" style="text-align:center"><div class="spin"></div><b>Memeriksa NIP…</b><p class="lead" style="margin-bottom:0">Mencocokkan NIP dengan data kepegawaian.</p></div></div>'}
 function stats(shs){const o={t:0,S:0,T:0,B:0,P:0,rows:0,rS:0,rT:0,rB:0},g={};
@@ -194,7 +211,7 @@ function setTheme(t,save){document.documentElement.dataset.theme=t;if(save){try{
  const d=t==='dark';$('#tg')?.classList.toggle('on',d);const i=$('#tgi');if(i)i.innerHTML=ico(d?'moon':'sun',13);const x=$('#tgt');if(x)x.textContent=d?'Gelap':'Terang';const m=$('#tg2');if(m)m.innerHTML=ico(d?'moon':'sun',20)}
 function flip(){const h=document.documentElement;h.classList.add('tt');setTheme(h.dataset.theme==='dark'?'light':'dark',true);setTimeout(()=>h.classList.remove('tt'),500)}
 function shell(){const u=S.u,sup=u.acc==='superadmin';document.body.classList.remove('lg');document.body.classList.add('on');
- $('#app').innerHTML=`<div id="shell"><aside class="side" id="side"><div class="brand"><div class="logo">${ico('shield',24)}</div><div><b>Koreksi Data</b><div class="sub">Keluarga Pegawai</div></div></div><nav class="nav"><i class="ind" id="ind"></i>${MENU.filter(m=>m[0]!=='kelola'||sup).map(m=>`<button class="ni" data-t="${m[0]}"><span class="ic">${ico(m[2],20)}</span>${m[1]}</button>`).join('')}</nav><div class="sbot"><div class="av">${esc((u.name||'?')[0].toUpperCase())}</div><div class="un"><b>${esc(u.name)}</b><span>${u.nip?'NIP '+esc(u.nip):'Akun '+esc(u.acc)}</span></div><button class="tgl" id="tg"><span>Mode <b id="tgt">Terang</b></span><span class="sw"><i id="tgi"></i></span></button><button class="btn" id="lo">${ico('out',16)} Keluar</button><div class="ver">Versi 3.9</div></div></aside><div class="bd" id="bd"></div><main class="cont"><div class="top"><button class="hb" id="hb">☰</button><b>Koreksi Data Keluarga</b><button class="hb tgm" id="tg2"></button></div><div class="ph"><h2 id="pt"></h2><div class="mut" id="ps"></div></div><div id="view"></div></main></div>`;
+ $('#app').innerHTML=`<div id="shell"><aside class="side" id="side"><div class="brand"><div class="logo">${ico('shield',24)}</div><div><b>Koreksi Data</b><div class="sub">Keluarga Pegawai</div></div></div><nav class="nav"><i class="ind" id="ind"></i>${MENU.filter(m=>m[0]!=='kelola'||sup).map(m=>`<button class="ni" data-t="${m[0]}"><span class="ic">${ico(m[2],20)}</span>${m[1]}</button>`).join('')}</nav><div class="sbot"><div class="av">${esc((u.name||'?')[0].toUpperCase())}</div><div class="un"><b>${esc(u.name)}</b><span>${u.nip?'NIP '+esc(u.nip):'Akun '+esc(u.acc)}</span></div><button class="tgl" id="tg"><span>Mode <b id="tgt">Terang</b></span><span class="sw"><i id="tgi"></i></span></button><button class="btn" id="lo">${ico('out',16)} Keluar</button><div class="ver">Versi 4.1</div></div></aside><div class="bd" id="bd"></div><main class="cont"><div class="top"><button class="hb" id="hb">☰</button><b>Koreksi Data Keluarga</b><button class="hb tgm" id="tg2"></button></div><div class="ph"><h2 id="pt"></h2><div class="mut" id="ps"></div></div><div id="view"></div></main></div>`;
  $('#lo').onclick=()=>logout();$('#tg').onclick=$('#tg2').onclick=flip;setTheme(document.documentElement.dataset.theme);
  document.querySelectorAll('.ni').forEach(b=>b.onclick=()=>{$('#side').classList.remove('open');if(S.tab!==b.dataset.t){S.tab=b.dataset.t;sessionStorage.setItem('tb',S.tab);S.anim=true;refresh()}});
  $('#hb').onclick=()=>$('#side').classList.toggle('open');$('#bd').onclick=()=>$('#side').classList.remove('open')}
